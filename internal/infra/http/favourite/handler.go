@@ -1,9 +1,9 @@
-// Package favourite contains the favourite Handler of the domain
 package favourite
 
 import (
 	"encoding/json"
 	"fmt"
+	queries2 "github.com/akazantzidis/gwi-ass/internal/app/user/queries"
 	"net/http"
 
 	"github.com/akazantzidis/gwi-ass/internal/app"
@@ -17,11 +17,11 @@ import (
 // Handler Favorite http request Handler
 type Handler struct {
 	favoriteServices app.FavoriteServices
+	userServices     app.UserServices
 }
 
-// NewHandlerF Constructor
-func NewHandlerFF(app app.FavoriteServices) *Handler {
-	return &Handler{favoriteServices: app}
+func NewHandler(app app.FavoriteServices, userApp app.UserServices) *Handler {
+	return &Handler{favoriteServices: app, userServices: userApp}
 }
 
 // ErrorResponse standard JSON error response
@@ -124,6 +124,15 @@ func (c Handler) Create(w http.ResponseWriter, r *http.Request) {
 	var req CreateFavoriteRequestModel
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		return
+	}
+
+	_, err = c.userServices.Queries.GetUserHandler.Handle(queries2.GetUserRequest{
+		ID: userID,
+	})
+
+	if err != nil {
+		writeJSONError(w, http.StatusNotFound, err, nil)
 		return
 	}
 

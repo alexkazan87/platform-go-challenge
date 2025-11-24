@@ -1,14 +1,14 @@
-// Package http contains the implementation of the HTTP server.
 package http
 
 import (
 	"fmt"
+	"github.com/akazantzidis/gwi-ass/internal/app"
+	"github.com/akazantzidis/gwi-ass/internal/infra/http/auth"
+	"github.com/akazantzidis/gwi-ass/internal/infra/http/favourite"
+	"github.com/akazantzidis/gwi-ass/internal/pkg/middleware"
+	"github.com/gorilla/mux"
 	"log"
 	"net/http"
-
-	"github.com/akazantzidis/gwi-ass/internal/app"
-	"github.com/akazantzidis/gwi-ass/internal/infra/http/favourite"
-	"github.com/gorilla/mux"
 )
 
 // Server Represents the http server running for this service
@@ -21,42 +21,44 @@ type Server struct {
 func NewServer(appServicesF app.Services) *Server {
 	httpServer := &Server{appServicesF: appServicesF}
 	httpServer.router = mux.NewRouter()
-	httpServer.AddFavoriteHTTPRoutes()
+
+	// use services to initialize handlers
+	authHandler := auth.NewAuthHandler(appServicesF.AuthServices)
+
+	// Public routes
+	public := httpServer.router.PathPrefix("/").Subrouter()
+	public.HandleFunc("/login", authHandler.Login).Methods("POST")
+	public.HandleFunc("/refresh", authHandler.Refresh).Methods("POST")
+	public.HandleFunc("/logout", authHandler.Logout).Methods("POST")
+	public.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	}).Methods("GET")
+
+	// Private routes - apply JWT middleware
+	private := httpServer.router.PathPrefix("/").Subrouter()
+	private.Use(middleware.JWTMiddleware)
+
+	// keep your favorites handlers on private subrouter
+	h := favourite.NewHandler(httpServer.appServicesF.FavoriteServices, httpServer.appServicesF.UserServices)
+	base := "/users/{userID}/favorites"
+
+	private.HandleFunc(base, h.GetAllF).Methods("GET")
+	private.HandleFunc(base+"/{favoriteId}", h.GetByIDF).Methods("GET")
+	private.HandleFunc(base, h.Create).Methods("POST")
+	private.HandleFunc(base+"/{favoriteId}", h.Patch).Methods("PATCH")
+	private.HandleFunc(base+"/{favoriteId}", h.Update).Methods("PUT")
+	private.HandleFunc(base+"/{favoriteId}", h.Delete).Methods("DELETE")
+
+	// Example admin-only route
+	adminOnly := private.PathPrefix("/admin").Subrouter()
+	adminOnly.Use(middleware.RequireRole("admin"))
+	adminOnly.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("secret admin stats"))
+	}).Methods("GET")
+
 	http.Handle("/", httpServer.router)
-
 	return httpServer
-}
-
-func (httpServer *Server) AddFavoriteHTTPRoutes() {
-	const base = "/users/{userID}/favorites"
-
-	h := favourite.NewHandlerFF(httpServer.appServicesF.FavoriteServices)
-
-	// Queries
-	httpServer.router.HandleFunc(
-		base,
-		h.GetAllF,
-	).Methods("GET")
-
-	httpServer.router.HandleFunc(base+"/{favoriteId}",
-		h.GetByIDF,
-	).Methods("GET")
-
-	// Commands
-	httpServer.router.HandleFunc(base,
-		h.Create,
-	).Methods("POST")
-
-	httpServer.router.HandleFunc(base+"/{favoriteId}",
-		h.Patch).Methods("PATCH")
-
-	httpServer.router.HandleFunc(base+"/{favoriteId}",
-		h.Update,
-	).Methods("PUT")
-
-	httpServer.router.HandleFunc(base+"/{favoriteId}",
-		h.Delete,
-	).Methods("DELETE")
 }
 
 // ListenAndServe Starts listening for requests

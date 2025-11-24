@@ -2,7 +2,12 @@
 package app
 
 import (
+	"github.com/akazantzidis/gwi-ass/internal/app/auth/command"
 	"github.com/akazantzidis/gwi-ass/internal/app/favourite/commands"
+	queries2 "github.com/akazantzidis/gwi-ass/internal/app/user/queries"
+	"github.com/akazantzidis/gwi-ass/internal/domain/token"
+	"github.com/akazantzidis/gwi-ass/internal/domain/user"
+
 	"github.com/akazantzidis/gwi-ass/internal/app/favourite/queries"
 	"github.com/akazantzidis/gwi-ass/internal/app/notification"
 	"github.com/akazantzidis/gwi-ass/internal/domain/favourite"
@@ -14,6 +19,8 @@ import (
 type Queries struct {
 	GetAllFavoritesHandler queries.GetAllFavoritesRequestHandler
 	GetFavoriteHandler     queries.GetFavoriteRequestHandler
+
+	GetUserHandler queries2.GetUserHandler
 }
 
 // Commands Contains all available command handlers of this app
@@ -23,10 +30,24 @@ type Commands struct {
 	UpdatePartialFavoriteHandler commands.UpdatePartialFavoriteRequestHandler
 
 	DeleteFavoriteHandler commands.DeleteFavoriteRequestHandler
+
+	LoginUserHandler        command.LoginHandler
+	RefreshTokenUserHandler command.RefreshHandler
+	LogoutUserHandler       command.LogoutHandler
 }
 
-// FavoriteServices Contains the grouped queries and commands of the app layer
+// FavoriteServices Contains the grouped queries and command of the app layer
 type FavoriteServices struct {
+	Queries  Queries
+	Commands Commands
+}
+
+type AuthServices struct {
+	Queries  Queries
+	Commands Commands
+}
+
+type UserServices struct {
 	Queries  Queries
 	Commands Commands
 }
@@ -34,10 +55,12 @@ type FavoriteServices struct {
 // Services contains all exposed services of the application layer
 type Services struct {
 	FavoriteServices FavoriteServices
+	AuthServices     AuthServices
+	UserServices     UserServices
 }
 
 // NewServices Bootstraps Application Layer dependencies
-func NewServicesF(favoriteRepo favourite.Repository, ns notification.Service, _ uuid.Provider, _ time.Provider) Services {
+func NewServices(favoriteRepo favourite.Repository, ns notification.Service, userRepo user.Repository, refreshTokenRepo token.RefreshRepository, _ uuid.Provider, _ time.Provider) Services {
 	return Services{
 		FavoriteServices: FavoriteServices{
 			Queries: Queries{
@@ -51,6 +74,20 @@ func NewServicesF(favoriteRepo favourite.Repository, ns notification.Service, _ 
 
 				DeleteFavoriteHandler: commands.NewDeleteFavoriteRequestHandler(favoriteRepo),
 			},
+		},
+		AuthServices: AuthServices{
+			Queries: Queries{},
+			Commands: Commands{
+				LoginUserHandler:        command.NewLoginHandler(userRepo, refreshTokenRepo),
+				LogoutUserHandler:       command.NewLogoutHandler(refreshTokenRepo),
+				RefreshTokenUserHandler: command.NewRefreshHandler(refreshTokenRepo),
+			},
+		},
+		UserServices: UserServices{
+			Queries: Queries{
+				GetUserHandler: queries2.NewGetUserHandler(userRepo),
+			},
+			Commands: Commands{},
 		},
 	}
 }

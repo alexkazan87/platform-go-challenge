@@ -42,7 +42,7 @@ func NewAddFavoriteRequestHandler(
 // Handle adds a new favorite
 func (h addFavoriteRequestHandler) Handle(req AddFavoriteRequest) error {
 	fav := favourite.Favorite{
-		ID:          uuid.New(), // generate UUID using google/uuid
+		ID:          req.UserID,
 		Type:        req.Type,
 		Description: req.Description,
 		Data:        req.Data,
