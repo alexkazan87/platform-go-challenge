@@ -1,19 +1,18 @@
-// Package memory implements the Repository Interface to provide an in-memory storage provider
 package memory
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/akazantzidis/gwi-ass/internal/domain/favourite"
 	"github.com/google/uuid"
 )
 
-// Repo Implements the Repository Interface to provide an in-memory storage provider
 type Repo struct {
+	mu         sync.RWMutex
 	favourites map[string]map[string]favourite.Favorite
 }
 
-// NewRepo Constructor
 func NewRepo() *Repo {
 	return &Repo{
 		favourites: make(map[string]map[string]favourite.Favorite),
@@ -26,7 +25,10 @@ func (r *Repo) ensureUser(userID string) {
 	}
 }
 
-func (r Repo) GetByID(userID uuid.UUID, favoriteID uuid.UUID) (*favourite.Favorite, error) {
+func (r *Repo) GetByID(userID uuid.UUID, favoriteID uuid.UUID) (*favourite.Favorite, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	userMap, ok := r.favourites[userID.String()]
 	if !ok {
 		return nil, nil
@@ -36,11 +38,14 @@ func (r Repo) GetByID(userID uuid.UUID, favoriteID uuid.UUID) (*favourite.Favori
 	if !ok {
 		return nil, nil
 	}
+
 	return &fav, nil
 }
 
-// GetAll Returns all stored favourites
-func (r Repo) GetAll(userID uuid.UUID) ([]favourite.Favorite, error) {
+func (r *Repo) GetAll(userID uuid.UUID) ([]favourite.Favorite, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
 	userMap, ok := r.favourites[userID.String()]
 	if !ok {
 		return []favourite.Favorite{}, nil
@@ -54,22 +59,27 @@ func (r Repo) GetAll(userID uuid.UUID) ([]favourite.Favorite, error) {
 }
 
 func (r *Repo) Add(userID uuid.UUID, favorite favourite.Favorite) error {
-	r.ensureUser(userID.String())
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
+	r.ensureUser(userID.String())
 	r.favourites[userID.String()][favorite.ID.String()] = favorite
 	return nil
 }
 
-// Update the provided favourite
 func (r *Repo) Update(userID uuid.UUID, favorite favourite.Favorite) error {
-	r.ensureUser(userID.String())
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
+	r.ensureUser(userID.String())
 	r.favourites[userID.String()][favorite.ID.String()] = favorite
 	return nil
 }
 
-// Delete the favourite with the provided id
 func (r *Repo) Delete(userID uuid.UUID, favoriteID uuid.UUID) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	userMap, ok := r.favourites[userID.String()]
 	if !ok {
 		return fmt.Errorf("user not found")
