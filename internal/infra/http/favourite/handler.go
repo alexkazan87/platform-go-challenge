@@ -49,6 +49,10 @@ func (c Handler) GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if favorites == nil {
+		favorites = []queries.GetAllFavoritesResult{}
+	}
+
 	json.NewEncoder(w).Encode(favorites)
 }
 
