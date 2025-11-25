@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	queries2 "github.com/akazantzidis/gwi-ass/internal/app/user/queries"
+	"github.com/akazantzidis/gwi-ass/internal/pkg/helper"
+	"github.com/akazantzidis/gwi-ass/internal/pkg/middleware"
 	"net/http"
 
 	"github.com/akazantzidis/gwi-ass/internal/app"
@@ -24,22 +26,6 @@ func NewHandler(app app.FavoriteServices, userApp app.UserServices) *Handler {
 	return &Handler{favoriteServices: app, userServices: userApp}
 }
 
-// ErrorResponse standard JSON error response
-type ErrorResponse struct {
-	Error   string      `json:"error"`
-	Details interface{} `json:"details,omitempty"`
-}
-
-// writeJSONError writes an error response as JSON
-func writeJSONError(w http.ResponseWriter, status int, err error, details interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(ErrorResponse{
-		Error:   err.Error(),
-		Details: details,
-	})
-}
-
 // URL param constants
 const (
 	UserIDURLParam           = "userID"
@@ -48,12 +34,10 @@ const (
 	DeleteFavoriteIDURLParam = "cragId"
 )
 
-// GetAllF returns all favorites for a given user
-func (c Handler) GetAllF(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userID, err := uuid.Parse(vars[UserIDURLParam])
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid user ID"), nil)
+// GetAll returns all favorites for a given user
+func (c Handler) GetAll(w http.ResponseWriter, r *http.Request) {
+	userID, ok := extractUserID(w, r)
+	if !ok {
 		return
 	}
 
@@ -61,31 +45,28 @@ func (c Handler) GetAllF(w http.ResponseWriter, r *http.Request) {
 		queries.GetAllFavoritesRequest{UserID: userID},
 	)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err, nil)
+		helper.WriteJSONError(w, http.StatusInternalServerError, err, nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(favorites)
 }
 
-// GetByIDF returns a favorite for a given user
-func (c Handler) GetByIDF(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	userID, err := uuid.Parse(vars[UserIDURLParam])
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid user ID"), nil)
+// GetByID returns a favorite for a given user
+func (c Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	userID, ok := extractUserID(w, r)
+	if !ok {
 		return
 	}
 
+	vars := mux.Vars(r)
 	favoriteID, err := uuid.Parse(vars[GetFavoriteIDURLParam])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid favorite ID"), nil)
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid favorite ID"), nil)
 		return
 	}
 
-	favorite, err := c.favoriteServices.Queries.GetFavoriteHandler.Handle(
+	fav, err := c.favoriteServices.Queries.GetFavoriteHandler.Handle(
 		queries.GetFavoriteRequest{
 			UserID:     userID,
 			FavoriteID: favoriteID,
@@ -93,16 +74,15 @@ func (c Handler) GetByIDF(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err, nil)
+		helper.WriteJSONError(w, http.StatusInternalServerError, err, nil)
 		return
 	}
-	if favorite == nil {
-		writeJSONError(w, http.StatusNotFound, fmt.Errorf("favorite not found for this user"), nil)
+	if fav == nil {
+		helper.WriteJSONError(w, http.StatusNotFound, fmt.Errorf("favorite not found"), nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(favorite)
+	json.NewEncoder(w).Encode(fav)
 }
 
 // CreateFavoriteRequestModel represents the request model expected for Add request
@@ -114,29 +94,26 @@ type CreateFavoriteRequestModel struct {
 
 // Create adds a new favorite for a user
 func (c Handler) Create(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userID, err := uuid.Parse(vars[UserIDURLParam])
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid user ID"), nil)
+	userID, ok := extractUserID(w, r)
+	if !ok {
 		return
 	}
 
 	var req CreateFavoriteRequestModel
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
 
-	_, err = c.userServices.Queries.GetUserHandler.Handle(queries2.GetUserRequest{
-		ID: userID,
-	})
-
-	if err != nil {
-		writeJSONError(w, http.StatusNotFound, err, nil)
+	// Ensure user exists
+	if _, err := c.userServices.Queries.GetUserHandler.Handle(
+		queries2.GetUserRequest{ID: userID},
+	); err != nil {
+		helper.WriteJSONError(w, http.StatusNotFound, err, nil)
 		return
 	}
 
-	err = c.favoriteServices.Commands.CreateFavoriteHandler.Handle(
+	err := c.favoriteServices.Commands.CreateFavoriteHandler.Handle(
 		commands.AddFavoriteRequest{
 			UserID:      userID,
 			Type:        req.Type,
@@ -145,7 +122,7 @@ func (c Handler) Create(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err, nil)
+		helper.WriteJSONError(w, http.StatusInternalServerError, err, nil)
 		return
 	}
 
@@ -169,60 +146,57 @@ type PatchFavoriteRequestModel struct {
 
 // Patch handles partial updates for favorites
 func (c Handler) Patch(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	userID, err := uuid.Parse(vars[UserIDURLParam])
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid user ID"), nil)
+	userID, ok := extractUserID(w, r)
+	if !ok {
 		return
 	}
 
+	vars := mux.Vars(r)
 	favID, err := uuid.Parse(vars[UpdateFavoriteIDURLParam])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid favorite ID"), nil)
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid favorite ID"), nil)
 		return
 	}
 
 	var req PatchFavoriteRequestModel
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
 
-	reqCommand := commands.PatchFavoriteRequest{
-		Type:        req.Type,
-		Description: req.Description,
-		Data:        req.Data,
-	}
-
-	fav, err := c.favoriteServices.Commands.UpdatePartialFavoriteHandler.HandlePartial(userID, favID, reqCommand)
+	result, err := c.favoriteServices.Commands.UpdatePartialFavoriteHandler.HandlePartial(
+		userID, favID,
+		commands.PatchFavoriteRequest{
+			Type:        req.Type,
+			Description: req.Description,
+			Data:        req.Data,
+		},
+	)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err, nil)
+		helper.WriteJSONError(w, http.StatusInternalServerError, err, nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(fav)
+	json.NewEncoder(w).Encode(result)
 }
 
 // Update handles full updates
 func (c Handler) Update(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	userID, err := uuid.Parse(vars[UserIDURLParam])
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid user ID"), nil)
+	userID, ok := extractUserID(w, r)
+	if !ok {
 		return
 	}
 
+	vars := mux.Vars(r)
 	favoriteID, err := uuid.Parse(vars[UpdateFavoriteIDURLParam])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid favorite ID"), nil)
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid favorite ID"), nil)
 		return
 	}
 
 	var req UpdateFavoriteRequestModel
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
 		return
 	}
 
@@ -236,7 +210,7 @@ func (c Handler) Update(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err, nil)
+		helper.WriteJSONError(w, http.StatusInternalServerError, err, nil)
 		return
 	}
 
@@ -245,17 +219,15 @@ func (c Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 // Delete deletes a favorite
 func (c Handler) Delete(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-
-	userID, err := uuid.Parse(vars[UserIDURLParam])
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid user ID"), nil)
+	userID, ok := extractUserID(w, r)
+	if !ok {
 		return
 	}
 
+	vars := mux.Vars(r)
 	favoriteID, err := uuid.Parse(vars[DeleteFavoriteIDURLParam])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid favorite ID"), nil)
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid favorite ID"), nil)
 		return
 	}
 
@@ -266,9 +238,41 @@ func (c Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		},
 	)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, err, nil)
+		helper.WriteJSONError(w, http.StatusInternalServerError, err, nil)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// extractUserID checks both context and URL param, ensuring they match.
+func extractUserID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
+	// 1. Read from JWT context
+	ctxVal := r.Context().Value(middleware.ContextUserKey)
+	if ctxVal == nil {
+		helper.WriteJSONError(w, http.StatusUnauthorized, fmt.Errorf("missing user in token"), nil)
+		return uuid.Nil, false
+	}
+
+	ctxUserID, ok := ctxVal.(uuid.UUID)
+	if !ok {
+		helper.WriteJSONError(w, http.StatusUnauthorized, fmt.Errorf("invalid user ID in token"), nil)
+		return uuid.Nil, false
+	}
+
+	// 2. Read from URL param
+	vars := mux.Vars(r)
+	paramID, err := uuid.Parse(vars[UserIDURLParam])
+	if err != nil {
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid user ID parameter"), nil)
+		return uuid.Nil, false
+	}
+
+	// 3. Compare — forbid accessing other users
+	if ctxUserID != paramID {
+		helper.WriteJSONError(w, http.StatusForbidden, fmt.Errorf("forbidden: cannot access another user's data"), nil)
+		return uuid.Nil, false
+	}
+
+	return ctxUserID, true
 }

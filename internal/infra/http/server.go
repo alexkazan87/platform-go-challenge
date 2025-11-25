@@ -39,18 +39,17 @@ func NewServer(appServicesF app.Services) *Server {
 	private := httpServer.router.PathPrefix("/").Subrouter()
 	private.Use(middleware.JWTMiddleware)
 
-	// keep your favorites handlers on private subrouter
 	h := favourite.NewHandler(httpServer.appServicesF.FavoriteServices, httpServer.appServicesF.UserServices)
 	base := "/users/{userID}/favorites"
 
-	private.HandleFunc(base, h.GetAllF).Methods("GET")
-	private.HandleFunc(base+"/{favoriteId}", h.GetByIDF).Methods("GET")
+	private.HandleFunc(base, h.GetAll).Methods("GET")
+	private.HandleFunc(base+"/{favoriteId}", h.GetByID).Methods("GET")
 	private.HandleFunc(base, h.Create).Methods("POST")
 	private.HandleFunc(base+"/{favoriteId}", h.Patch).Methods("PATCH")
 	private.HandleFunc(base+"/{favoriteId}", h.Update).Methods("PUT")
 	private.HandleFunc(base+"/{favoriteId}", h.Delete).Methods("DELETE")
 
-	// Example admin-only route
+	// admin-only route
 	adminOnly := private.PathPrefix("/admin").Subrouter()
 	adminOnly.Use(middleware.RequireRole("admin"))
 	adminOnly.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +60,6 @@ func NewServer(appServicesF app.Services) *Server {
 	return httpServer
 }
 
-// ListenAndServe Starts listening for requests
 func (httpServer *Server) ListenAndServe(port string) {
 	fmt.Println("Listening on port " + port)
 	log.Fatal(http.ListenAndServe(port, nil))

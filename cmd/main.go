@@ -24,8 +24,6 @@ func main() {
 }
 
 func seedInitialUsers(infra infra.Services) {
-	//f47ac10b-58cc-4372-a567-0e02b2c3d479
-	//9c858901-8a57-4791-81fe-4c455b099bc9
 	user, err := infra.UserRepository.Add("alice", "password1", []string{"user"})
 	if err != nil {
 		log.Fatalf("failed to add user alice: %v", err)
