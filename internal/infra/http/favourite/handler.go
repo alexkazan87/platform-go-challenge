@@ -31,7 +31,7 @@ const (
 	UserIDURLParam           = "userID"
 	GetFavoriteIDURLParam    = "favoriteId"
 	UpdateFavoriteIDURLParam = "favoriteId"
-	DeleteFavoriteIDURLParam = "cragId"
+	DeleteFavoriteIDURLParam = "favoriteId"
 )
 
 // GetAll returns all favorites for a given user
