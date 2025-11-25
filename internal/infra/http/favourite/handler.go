@@ -254,9 +254,15 @@ func extractUserID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 		return uuid.Nil, false
 	}
 
-	ctxUserID, ok := ctxVal.(uuid.UUID)
+	userIDStr, ok := ctxVal.(string) // JWT middleware should store as string
 	if !ok {
 		helper.WriteJSONError(w, http.StatusUnauthorized, fmt.Errorf("invalid user ID in token"), nil)
+		return uuid.Nil, false
+	}
+
+	ctxUserID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		helper.WriteJSONError(w, http.StatusUnauthorized, fmt.Errorf("invalid user ID format in token"), nil)
 		return uuid.Nil, false
 	}
 
