@@ -109,6 +109,11 @@ func (c Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !req.Type.IsValid() {
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid asset type"), nil)
+		return
+	}
+
 	// Ensure user exists
 	if _, err := c.userServices.Queries.GetUserHandler.Handle(
 		queries2.GetUserRequest{ID: userID},
@@ -117,8 +122,11 @@ func (c Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	newFavID := uuid.New()
+
 	err := c.favoriteServices.Commands.CreateFavoriteHandler.Handle(
 		commands.AddFavoriteRequest{
+			ID:          newFavID,
 			UserID:      userID,
 			Type:        req.Type,
 			Description: req.Description,
@@ -130,7 +138,9 @@ func (c Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"id": newFavID.String()})
 }
 
 // UpdateFavoriteRequestModel represents the request model of Update
@@ -168,6 +178,12 @@ func (c Handler) Patch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate if type provided
+	if req.Type != nil && !req.Type.IsValid() {
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid asset type"), nil)
+		return
+	}
+
 	result, err := c.favoriteServices.Commands.UpdatePartialFavoriteHandler.HandlePartial(
 		userID, favID,
 		commands.PatchFavoriteRequest{
@@ -201,6 +217,12 @@ func (c Handler) Update(w http.ResponseWriter, r *http.Request) {
 	var req UpdateFavoriteRequestModel
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid request body"), nil)
+		return
+	}
+
+	// Validation
+	if !req.Type.IsValid() {
+		helper.WriteJSONError(w, http.StatusBadRequest, fmt.Errorf("invalid asset type"), nil)
 		return
 	}
 

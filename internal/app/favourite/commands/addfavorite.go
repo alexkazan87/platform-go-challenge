@@ -12,7 +12,8 @@ import (
 
 // AddFavoriteRequest model for creating a favorite
 type AddFavoriteRequest struct {
-	UserID      uuid.UUID // Use google/uuid
+	ID          uuid.UUID
+	UserID      uuid.UUID
 	Type        favourite.AssetType
 	Description string
 	Data        json.RawMessage
@@ -42,7 +43,7 @@ func NewAddFavoriteRequestHandler(
 // Handle adds a new favorite
 func (h addFavoriteRequestHandler) Handle(req AddFavoriteRequest) error {
 	fav := favourite.Favorite{
-		ID:          uuid.New(),
+		ID:          req.ID,
 		Type:        req.Type,
 		Description: req.Description,
 		Data:        req.Data,
