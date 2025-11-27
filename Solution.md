@@ -160,6 +160,12 @@ docker run -p 8080:8080 gwi-favorites
 ## Authentication Flow
 
 ### User Login
+
+Once the application starts, two users are preloaded into in-memory storage: Alice (role: user) and Bob (role: admin).
+Each user has a unique UUID. After authenticating and receiving a JWT, the user ID stored in the JWT context can be used to access the Favorite API endpoints.
+
+![Code Design](./docs/graphics/user_initialization.png)
+
 1. User logs in using `/login`.
 2. Server returns:
     - `access_token`
@@ -214,7 +220,8 @@ curl -X POST http://localhost:8080/refresh \
 
 ```bash
 curl -X GET "http://localhost:8080/users/<userID>/favorites" \
--H "Authorization: Bearer <access_token>"```
+-H "Authorization: Bearer <access_token>"
+```
 
 ```bash
 curl -X GET "http://localhost:8080/users/<userID>/favorites/<favoriteId>" \
