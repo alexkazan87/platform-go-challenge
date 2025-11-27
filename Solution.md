@@ -110,7 +110,7 @@ make build  ## Build the app executable for Linux
 make fmt  ## Format the source code
 ```
 
-## ✨ Features
+## Features
 
 - Full REST API for managing user favorites
 - JWT authentication (access + refresh tokens)
@@ -118,14 +118,13 @@ make fmt  ## Format the source code
 - Clean architecture with clear domain boundaries
 - UUID validation & strict input checks
 - Notifications upon favorite creation
-- Consistent JSON error responses
 - Fully containerized (Dockerfile included)
 - Unit-testable domain logic
 - In-memory storage for simplicity (easily replaceable)
 
 ---
 
-## 🧱 Tech Stack
+## Tech Stack
 
 - **Go 1.24**
 - Gorilla Mux – routing
@@ -136,7 +135,7 @@ make fmt  ## Format the source code
 
 ---
 
-## ▶️ Running Locally
+## Running Locally
 
 ```bash
 go mod tidy
@@ -147,7 +146,7 @@ Server runs at:
 
 http://localhost:8080
 
-## 🐳 Docker Usage - Build image
+## Docker Usage - Build image
 ```bash
 
 docker build -t gwi-favorites .
@@ -158,7 +157,7 @@ docker build -t gwi-favorites .
 docker run -p 8080:8080 gwi-favorites
 ```
 
-# 🔐 Authentication Flow
+## Authentication Flow
 
 ### User Login
 1. User logs in using `/login`.
@@ -172,9 +171,9 @@ docker run -p 8080:8080 gwi-favorites
 
 ---
 
-## 📘 API Reference
+## API Reference
 
-### 🔑 Authentication Endpoints
+###  Authentication Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|------------|
@@ -182,7 +181,7 @@ docker run -p 8080:8080 gwi-favorites
 | POST   | `/refresh` | Generate new access token |
 | POST   | `/logout` | Invalidate refresh token |
 
-### ⭐ Favorite Endpoints (JWT required)
+###  Favorite Endpoints (JWT required)
 
 | Method | Endpoint | Description |
 |--------|----------|------------|
@@ -213,13 +212,16 @@ curl -X POST http://localhost:8080/refresh \
 
 ### 💻 cURL Examples
 
-
+```bash
 curl -X GET "http://localhost:8080/users/<userID>/favorites" \
--H "Authorization: Bearer <access_token>"
+-H "Authorization: Bearer <access_token>"```
 
+```bash
 curl -X GET "http://localhost:8080/users/<userID>/favorites/<favoriteId>" \
 -H "Authorization: Bearer <access_token>"
+```
 
+```bash
 curl -X POST "http://localhost:8080/users/<userID>/favorites" \
 -H "Authorization: Bearer <access_token>" \
 -H "Content-Type: application/json" \
@@ -228,12 +230,14 @@ curl -X POST "http://localhost:8080/users/<userID>/favorites" \
 "description": "Daily social media hours",
 "data": {"x":"hours","y":"distribution"}
 }'
-
+```
+```bash
 curl -X PATCH "http://localhost:8080/users/<userID>/favorites/<favoriteId>" \
 -H "Authorization: Bearer <access_token>" \
 -H "Content-Type: application/json" \
 -d '{"description":"Updated favorite"}'
-
+```
+```bash
 curl -X PUT "http://localhost:8080/users/<userID>/favorites/<favoriteId>" \
 -H "Authorization: Bearer <access_token>" \
 -H "Content-Type: application/json" \
@@ -242,18 +246,20 @@ curl -X PUT "http://localhost:8080/users/<userID>/favorites/<favoriteId>" \
 "description": "40% of millennials...",
 "data": {}
 }'
+```
 
+```bash
 curl -X DELETE "http://localhost:8080/users/<userID>/favorites/<favoriteId>" \
 -H "Authorization: Bearer <access_token>"
+```
 
-## 🧪 Testing
+##  Testing
 go test ./...
 
 ### 🗄 Storage Discussion
 **Current:** In-memory Maps
 - Ultra-fast
 - No persistence
-- Perfect for challenge constraints
 
 **Real-world Options:**
 
@@ -262,8 +268,7 @@ go test ./...
 | Postgres  | Strong consistency, relational favorites |
 | Redis     | High-speed caching for user favorites |
 | MongoDB   | Flexible JSON-like storage for asset types |
-| DynamoDB  | Fully managed, scalable, event-driven |
-| CQRS/ES   | Ideal for high-write workloads |
+
 
 ## 🚀 Improvements & Future Enhancements
 - Switch to Postgres or Redis-backed storage
